@@ -12,15 +12,16 @@ shinyUI(bootstrapPage(
   
   leafletOutput("mymap", width = "100%", height = "100%"), 
   
-  absolutePanel(bottom = 10, left = 10,
-    actionButton("countryAction", "Reset to Country Map"),
+  absolutePanel(bottom = 10, right = 180, left = 180, fixed = TRUE, draggable = TRUE, 
+    #actionButton("countryAction", "Reset to Country Map"),
+    helpText(HTML("<h2>Reset to the country level map by clicking anywhere outside the polygons.</h2>")),
   #   actionButton("stateAction", "State Layer"),
     p(),
   #   leafletOutput("mymap", height = 600),
   
-  #   textOutput("click"),
-  #   textOutput("mouseover"),
-  #   textOutput("mouseout"),
+#     textOutput("bounds"),
+#     textOutput("zoom"),
+#     textOutput("mouseover"),
   
 #     textOutput("indTest1"),
 #     textOutput("indTest2"),

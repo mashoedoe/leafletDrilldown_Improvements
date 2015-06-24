@@ -46,7 +46,7 @@ load("simplified.RData")
 
 # Create the country map at app initialization
 paletteCountry <- colorQuantile("YlGnBu", countries$POP_EST, n = 10)
-info <- paste0("Hover over a country to view information.")
+info <- paste0("<h4><b>Hover over a country to view information.</h4></b>")
 
 
 
@@ -54,7 +54,6 @@ info <- paste0("Hover over a country to view information.")
 ############################################################################
 # Define server logic
 shinyServer(function(input, output, session) {
-  
   
   # initialize country to NULL
   selectedCountry <- NULL
@@ -73,12 +72,14 @@ shinyServer(function(input, output, session) {
                   color = ~paletteCountry(POP_EST),
                   group = "countries"
       ) %>%
-      addLayersControl(baseGroups = c("OpenStreetMap", "Stamen Toner Lite"),
+      addLayersControl(baseGroups = c("Stamen Toner Lite", "OpenStreetMap"),
+                       position = "bottomleft",
                        options = layersControlOptions(collapsed = FALSE))
   })
   
   # Returns the set of
   currentStates <- reactive({
+    
     if (is.null(selectedCountry)){
       return(NULL)
     } 
@@ -90,8 +91,9 @@ shinyServer(function(input, output, session) {
     } else if(selectedCountry == "Russian Federation"){
       states[states$geonunit == "Russia",]
     } else{
-        states[grepl(selectedCountry, factor(states$geonunit), fixed = TRUE),]
-      }
+      states[grepl(selectedCountry, factor(states$geonunit), fixed = TRUE),]
+    }
+    
   })
   
   observe({
@@ -109,13 +111,31 @@ shinyServer(function(input, output, session) {
         showGroup("countries") %>%
         addLegend(layerId = "legend", title = c("Population"), position = "bottomright", pal = paletteCountry, values = ~POP_EST) %>%
         addControl(layerId = "infoControl", html = info, position = "topright", className = "info")
-    } else {
+    
+    } else if (selectedCountry == "United States"){
       # Show states in selected country
       paletteState <- colorFactor(palette = "YlGnBu", domain = sort(currentStates()$name_len))
-      info <- paste0("Hover over a state to view information.")
+      info <- paste0("<h4><b> over a state to view information.</h4></b>")
+      
+      leafletProxy(mapId = "mymap", data = currentStates()) %>%
+        addPolygons(layerId = ~name,
+                    stroke = FALSE,
+                    fillOpacity = 0.5,
+                    smoothFactor = 0,
+                    color = ~paletteState(name_len),
+                    group = "states"
+        ) %>%
+        addLegend(layerId = "legend", title = c("Name Length"), position = "bottomright", pal = paletteState, values = ~sort(name_len)) %>%
+        addControl(layerId = "infoControl", html = info, position = "topright", className = "info") %>%
+        setView(lat = 51.0411425, lng = -95.8022806, zoom = 3)
+      
+    } else{
+      
+      paletteState <- colorFactor(palette = "YlGnBu", domain = sort(currentStates()$name_len))
+      info <- paste0("<h4><b>Hover over a state to view information.</h4></b>")
       
       bounds <- bbox(currentStates())
-      
+                
       leafletProxy(mapId = "mymap", data = currentStates()) %>%
         addPolygons(layerId = ~name,
                     stroke = FALSE,
@@ -137,7 +157,7 @@ shinyServer(function(input, output, session) {
     if (is.null(selectedCountry)) {
       
       country <- countries[countries$NAME_LONG == input$mymap_shape_mouseover$id,]
-      infoCountry <- paste0("<b>Country: </b>", country$NAME_LONG, "<br><b>Population: </b>", format(x = country$POP_EST, format = "d", big.mark = ","))
+      infoCountry <- paste0("<h4><b>Country: </b>", country$NAME_LONG, "<br><b>Population: </b>", format(x = country$POP_EST, format = "d", big.mark = ","), "<h4>")
       
       leafletProxy("mymap") %>%
         removeControl(layerId = "infoControl") %>%
@@ -146,7 +166,7 @@ shinyServer(function(input, output, session) {
     # else display state information  
     } else {
       state <- currentStates()[currentStates()$name == input$mymap_shape_mouseover$id,]
-      infoState <- paste0("<b>State: </b>", state$name, "<br><b>Name Length: </b>", state$name_len)
+      infoState <- paste0("<h4><b>State: </b>", state$name, "<br><b>Name Length: </b>", state$name_len, "<h4>")
       
       leafletProxy("mymap") %>%
         removeControl(layerId = "infoControl") %>%
