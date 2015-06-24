@@ -28,7 +28,7 @@ if (!file.exists("simplified.RData")) {
     states@data$name[is.na(states@data$name)] <- "Unknown"
     
     # simplify shapefile for improved performance
-    tol <- 0.1
+    tol <- 0.0001
     
     countriesSimplified <- gSimplify(countries, tol, topologyPreserve = TRUE)
     countries <- SpatialPolygonsDataFrame(countriesSimplified, data = countries@data)
@@ -39,6 +39,8 @@ if (!file.exists("simplified.RData")) {
     save("countries", "states", file = "simplified.RData")
   })
 }
+
+
 load("simplified.RData")
 
 
@@ -53,15 +55,10 @@ info <- paste0("Hover over a country to view information.")
 # Define server logic
 shinyServer(function(input, output, session) {
   
-  ### see what these lists look like
-  #   output$click <- renderPrint({input$mymap_shape_click$id})
-  #   output$mouseover <- renderPrint({input$mymap_shape_mouseover})
-  #   output$mouseout <- renderPrint({input$mymap_shape_mouseout})
   
-  
-  #output$indTest <- renderPrint({ind})
-  
+  # initialize country to NULL
   selectedCountry <- NULL
+  
   # Turn selectedCountry into reactive value; any change to selectedCountry will
   # notify reactive dependents
   makeReactiveBinding("selectedCountry")
@@ -69,22 +66,32 @@ shinyServer(function(input, output, session) {
   ### initialize map at country level
   output$mymap <- renderLeaflet({
     leaflet(countries) %>%
-      addTiles(group = "OSM") %>%
+      addTiles(group = "OpenStreetMap") %>%
       addProviderTiles(provider = "Stamen.TonerLite", group = "Stamen Toner Lite") %>%
       addPolygons(layerId = ~NAME_LONG,
                   stroke = FALSE, fillOpacity = 0.5, smoothFactor = 0.5,
                   color = ~paletteCountry(POP_EST),
                   group = "countries"
       ) %>%
-      addLayersControl(baseGroups = c("OSM", "Stamen Toner Lite"),
+      addLayersControl(baseGroups = c("OpenStreetMap", "Stamen Toner Lite"),
                        options = layersControlOptions(collapsed = FALSE))
   })
   
   # Returns the set of
   currentStates <- reactive({
-    if (is.null(selectedCountry))
+    if (is.null(selectedCountry)){
       return(NULL)
-    states[grepl(selectedCountry, factor(states$geonunit), fixed = TRUE),]
+    } 
+    
+    if(selectedCountry == "United States"){
+      states[states$geonunit == "United States of America",]
+    } else if(selectedCountry == "Baikonur Cosmodrome"){
+      states[states$geonunit == "Baykonur Cosmodrome",]
+    } else if(selectedCountry == "Russian Federation"){
+      states[states$geonunit == "Russia",]
+    } else{
+        states[grepl(selectedCountry, factor(states$geonunit), fixed = TRUE),]
+      }
   })
   
   observe({
@@ -123,16 +130,20 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  # if the map is at the country level, then display country information
+  # adjust info control based on hover
   observeEvent(input$mymap_shape_mouseover, {
     
+    # if the map is at the country level, then display country information
     if (is.null(selectedCountry)) {
+      
       country <- countries[countries$NAME_LONG == input$mymap_shape_mouseover$id,]
       infoCountry <- paste0("<b>Country: </b>", country$NAME_LONG, "<br><b>Population: </b>", format(x = country$POP_EST, format = "d", big.mark = ","))
       
       leafletProxy("mymap") %>%
         removeControl(layerId = "infoControl") %>%
         addControl(layerId = "infoControl", html = infoCountry, position = "topright", className = "info")
+    
+    # else display state information  
     } else {
       state <- currentStates()[currentStates()$name == input$mymap_shape_mouseover$id,]
       infoState <- paste0("<b>State: </b>", state$name, "<br><b>Name Length: </b>", state$name_len)
@@ -143,13 +154,14 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  
   observeEvent(input$mymap_shape_click, {
     if (is.null(selectedCountry)) {
       selectedCountry <<- input$mymap_shape_click$id
     }
   })
   
-  ### if select state action button, render state map
+  # if the user clicks anywhere outside the polygon or on the action button, reset to first country map
   observeEvent(input$countryAction, {
     selectedCountry <<- NULL
   })
